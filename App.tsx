@@ -1,11 +1,13 @@
 import React from 'react';
-import {Button, Image, StyleSheet, Text, View} from 'react-native';
+import {Button, Image, Platform, StyleSheet, Text, View, AsyncStorage} from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
-import {makeRedirectUri, ResponseType, TokenResponse, useAuthRequest} from 'expo-auth-session';
+import {makeRedirectUri, ResponseType, TokenResponse, useAuthRequest, exchangeCodeAsync} from 'expo-auth-session';
 import axios from 'axios';
+import Constants from "expo-constants";
+import Clipboard from 'expo-clipboard';
+
 
 const queryString = require('query-string');
-
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -18,52 +20,90 @@ const discovery = {
 export default function App() {
     const [userInfo, setUserInfo] = React.useState(null);
     const [token, setToken] = React.useState(null);
+
+    let redirectUri = makeRedirectUri();
+
     const [request, response, promptAsync] = useAuthRequest(
         {
-            responseType: ResponseType.Token,
+            responseType: ResponseType.Code,
             clientId: '90bcb46c467947b9ad0594d06ed8f5d4',
-            clientSecret: '702779c40cca4b7ca451257aac7102db',
             scopes: ['user-read-email', 'playlist-modify-public'],
             // In order to follow the "Authorization Code Flow" to fetch token after authorizationEndpoint
             // this must be set to false
             usePKCE: false,
-            redirectUri: makeRedirectUri({useProxy: false}),
+            // redirectUri: makeRedirectUri({useProxy: false}),
+            redirectUri: redirectUri,
         },
         discovery
     );
 
     React.useEffect(() => {
         if (response?.type === 'success') {
-            const {access_token} = response.params;
+            const {code} = response.params;
 
+            if(!token){
+                exchangeCodeAsync({ clientId: '90bcb46c467947b9ad0594d06ed8f5d4',
+                    clientSecret: '702779c40cca4b7ca451257aac7102db',
+                    code,
+                    redirectUri
+                }, discovery).then(setToken);
+            }
+
+            // axios.get(`https://api.spotify.com/v1/me`, {
+            //     headers: {
+            //         "Authorization": `Bearer ${access_token}`
+            //     }
+            // }).then(setUserInfo)
+            // setToken(TokenResponse.fromQueryParams(response.params))
+        }
+    }, [response]);
+
+    React.useEffect(() => {
+        if(token && !userInfo){
             axios.get(`https://api.spotify.com/v1/me`, {
-                headers: {
-                    "Authorization": `Bearer ${access_token}`
+                headers: { "Authorization": `Bearer ${token.accessToken}`
                 }
             }).then(setUserInfo)
-            setToken(TokenResponse.fromQueryParams(response.params))
         }
-        console.log(response)
-    }, [response]);
+    }, [token])
 
 
     const refresh = () => {
-        console.log(token)
-        axios.post(
-            'https://accounts.spotify.com/api/token',
-            queryString.stringify({
-                clientId: '90bcb46c467947b9ad0594d06ed8f5d4',
-                clientSecret: '702779c40cca4b7ca451257aac7102db',
+
+
+        axios({
+            url: 'https://accounts.spotify.com/api/token',
+            method: 'post',
+            params: {
                 grant_type: 'refresh_token',
-                refresh_token: token.access_token
-            }),
-            {
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                },
+                refresh_token: token.refreshToken
+            },
+            headers: {
+                'Accept':'application/json',
+                'Content-Type': 'application/x-www-form-urlencoded'
+            },
+            auth: {
+                username: '90bcb46c467947b9ad0594d06ed8f5d4',
+                password: '702779c40cca4b7ca451257aac7102db'
             }
-        ).then(x => console.log(x.data)).catch(x => console.log(x.response))
+        }).then(console.log).catch(console.log);
+
+        // axios.post(
+        //     'https://accounts.spotify.com/api/token',
+        //     queryString.stringify({
+        //         clientId: '90bcb46c467947b9ad0594d06ed8f5d4',
+        //         clientSecret: '702779c40cca4b7ca451257aac7102db',
+        //         grant_type: 'refresh_token',
+        //         refresh_token: token.refreshToken
+        //     }),
+        //     {
+        //         headers: {
+        //             'Content-Type': 'application/x-www-form-urlencoded',
+        //         },
+        //     }
+        // ).then(x => console.log(x.data)).catch(x => console.log(x.response))
     }
+
 
     return (
         <View style={styles.container}>
@@ -75,6 +115,9 @@ export default function App() {
                 }}
             />
             <View>
+                <Text>
+                    {redirectUri}
+                </Text>
                 <Text>
                     {userInfo?.data?.display_name}
                 </Text>
