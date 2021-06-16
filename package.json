@@ -5,7 +5,10 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "eject": "expo eject"
+    "eject": "expo eject",
+    "type-check": "tsc --pretty --noEmit",
+    "format": "prettier --write **/*.{js,ts,tsx}",
+    "lint": "eslint . --fix --ext ts --ext tsx --ext js"
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "^1.13.0",
@@ -30,13 +33,21 @@
     "react-native-reanimated": "~2.1.0",
     "react-native-safe-area-context": "3.2.0",
     "react-native-screens": "~3.0.0",
-    "react-native-web": "~0.13.12"
+    "react-native-web": "^0.16.5"
   },
   "devDependencies": {
     "@babel/core": "^7.9.0",
-    "typescript": "~4.0.0",
     "@types/react": "~16.9.35",
-    "@types/react-native": "~0.63.2"
+    "@types/react-native": "~0.63.2",
+    "@typescript-eslint/eslint-plugin": "^4.27.0",
+    "@typescript-eslint/parser": "^4.27.0",
+    "eslint": "^7.28.0",
+    "eslint-config-prettier": "^8.3.0",
+    "eslint-plugin-prettier": "^3.4.0",
+    "eslint-plugin-react": "^7.24.0",
+    "eslint-plugin-react-native": "^3.11.0",
+    "prettier": "^2.3.1",
+    "typescript": "~4.0.0"
   },
   "private": true
 }
