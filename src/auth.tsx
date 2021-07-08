@@ -1,17 +1,10 @@
 import React from 'react';
 import { deleteItemAsync, getItemAsync, setItemAsync } from 'expo-secure-store';
-import {
-  exchangeCodeAsync,
-  makeRedirectUri,
-  ResponseType,
-  TokenResponse,
-  useAuthRequest
-} from 'expo-auth-session';
+import { exchangeCodeAsync, makeRedirectUri, ResponseType, TokenResponse, useAuthRequest } from 'expo-auth-session';
 import * as WebBrowser from 'expo-web-browser';
 
 const credentials = {
   clientId: '90bcb46c467947b9ad0594d06ed8f5d4',
-  clientSecret: '702779c40cca4b7ca451257aac7102db'
 };
 
 const initialState = {
@@ -86,7 +79,7 @@ const discovery = {
 const AuthProvider: React.FC = (props) => {
   const [state, dispatch] = useAuthReducer();
   const redirectUri = makeRedirectUri();
-  const [, response, promptAsync] = useAuthRequest(
+  const [request, response, promptAsync] = useAuthRequest(
     {
       responseType: ResponseType.Code,
       clientId: credentials.clientId,
@@ -99,9 +92,7 @@ const AuthProvider: React.FC = (props) => {
         'user-library-read',
         'user-top-read'
       ],
-      // In order to follow the "Authorization Code Flow" to fetch token after authorizationEndpoint
-      // this must be set to false
-      usePKCE: false,
+      usePKCE: true,
       redirectUri: redirectUri
     },
     discovery
@@ -113,13 +104,14 @@ const AuthProvider: React.FC = (props) => {
       exchangeCodeAsync(
         {
           clientId: credentials.clientId,
-          clientSecret: credentials.clientSecret,
           code,
-          redirectUri
+          redirectUri,
+          extraParams: {
+            'code_verifier': request.codeVerifier
+          }
         },
         discovery
       ).then(async (token) => {
-        console.log(token);
         await setItemAsync('userToken', JSON.stringify(token));
         dispatch({ type: 'SIGN_IN', token: token });
       });
@@ -141,11 +133,11 @@ const AuthProvider: React.FC = (props) => {
           console.log('Refreshing...');
           await userToken.refreshAsync(
             {
-              clientId: credentials.clientId,
-              clientSecret: credentials.clientSecret
+              clientId: credentials.clientId
             },
             discovery
           );
+          await setItemAsync('userToken', JSON.stringify(userToken));
         }
       }
 
