@@ -4,7 +4,7 @@ import { exchangeCodeAsync, makeRedirectUri, ResponseType, TokenResponse, useAut
 import * as WebBrowser from 'expo-web-browser';
 
 const credentials = {
-  clientId: '90bcb46c467947b9ad0594d06ed8f5d4',
+  clientId: '90bcb46c467947b9ad0594d06ed8f5d4'
 };
 
 const initialState = {
@@ -48,6 +48,7 @@ const useAuthReducer = () => {
         return {
           ...prevState,
           isSignout: false,
+          isLoading: false,
           userToken: action.token,
           error: null
         };
@@ -55,12 +56,14 @@ const useAuthReducer = () => {
         return {
           ...prevState,
           isSignout: true,
+          isLoading: false,
           userToken: null,
           error: null
         };
       case 'ERROR':
         return {
           ...prevState,
+          isLoading: false,
           error: action.error
         };
     }
@@ -99,28 +102,6 @@ const AuthProvider: React.FC = (props) => {
   );
 
   React.useEffect(() => {
-    if (response?.type === 'success') {
-      const { code } = response.params;
-      exchangeCodeAsync(
-        {
-          clientId: credentials.clientId,
-          code,
-          redirectUri,
-          extraParams: {
-            'code_verifier': request.codeVerifier
-          }
-        },
-        discovery
-      ).then(async (token) => {
-        await setItemAsync('userToken', JSON.stringify(token));
-        dispatch({ type: 'SIGN_IN', token: token });
-      });
-    } else {
-      dispatch({ type: 'ERROR', error: JSON.stringify(response) });
-    }
-  }, [response]);
-
-  React.useEffect(() => {
     const fetchToken = async () => {
       const token = await getItemAsync('userToken');
       let userToken = JSON.parse(token);
@@ -136,7 +117,10 @@ const AuthProvider: React.FC = (props) => {
               clientId: credentials.clientId
             },
             discovery
-          );
+          ).catch(async () => {
+            await deleteItemAsync('userToken');
+            dispatch({ type: 'SIGN_OUT' });
+          });
           await setItemAsync('userToken', JSON.stringify(userToken));
         }
       }
@@ -151,7 +135,29 @@ const AuthProvider: React.FC = (props) => {
     () => ({
       state,
       signIn: async () => {
-        await promptAsync();
+        try {
+          const response = await promptAsync();
+          if (response?.type === 'success') {
+            const { code } = response.params;
+            const token = await exchangeCodeAsync(
+              {
+                clientId: credentials.clientId,
+                code,
+                redirectUri,
+                extraParams: {
+                  'code_verifier': request.codeVerifier
+                }
+              },
+              discovery
+            );
+            await setItemAsync('userToken', JSON.stringify(token));
+            dispatch({ type: 'SIGN_IN', token: token });
+          } else {
+            dispatch({ type: 'ERROR', error: JSON.stringify(response) });
+          }
+        } catch (e) {
+          dispatch({ type: 'ERROR', error: e });
+        }
       },
       signOut: async () => {
         await deleteItemAsync('userToken');
